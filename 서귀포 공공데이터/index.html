@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>서귀포 3D 공공데이터 지도</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font-family: system-ui, "Malgun Gothic", sans-serif; color: #1c1c1e; }
+  [hidden] { display: none !important; }
+  #map { position: absolute; inset: 0; }
+
+  /* 인증키 입력 화면 */
+  #gate { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
+          background: linear-gradient(160deg, #0b3d4f, #1b6b5a); padding: 16px; }
+  #gate .card { background: #fff; border-radius: 14px; padding: 28px; width: 440px; max-width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,.35); }
+  #gate h1 { margin: 0 0 6px; font-size: 22px; }
+  #gate p { margin: 0 0 16px; font-size: 13px; color: #555; line-height: 1.5; }
+  #gate input { width: 100%; padding: 11px 12px; font-size: 14px; border: 1px solid #bbb; border-radius: 8px; margin-bottom: 10px; }
+  #gate button { width: 100%; padding: 12px; font-size: 15px; border: 0; border-radius: 8px; background: #0a7; color: #fff; cursor: pointer; }
+  #gate button:disabled { background: #8ab; cursor: wait; }
+  #gate .err { color: #c00; font-size: 13px; min-height: 18px; margin-top: 8px; }
+
+  /* 패널 */
+  .panel { position: absolute; z-index: 10; background: rgba(255,255,255,.93); border-radius: 12px; padding: 12px 14px;
+           box-shadow: 0 4px 18px rgba(0,0,0,.25); font-size: 13px; }
+  #layers { top: 12px; left: 12px; min-width: 170px; }
+  #layers h3, #info h3 { margin: 0 0 8px; font-size: 13px; }
+  #layers label { display: flex; align-items: center; gap: 8px; margin: 6px 0; cursor: pointer; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  #layers .base { margin-top: 10px; padding-top: 8px; border-top: 1px solid #ddd; }
+  #layers button.small { margin-top: 8px; width: 100%; padding: 6px; border: 1px solid #bbb; border-radius: 6px; background: #fff; cursor: pointer; }
+
+  #info { top: 12px; right: 56px; width: 270px; max-height: calc(100% - 140px); overflow: auto; }
+  #info .month { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  #spotList { list-style: none; padding: 0; margin: 0; }
+  #spotList li { display: flex; justify-content: space-between; align-items: center; padding: 6px 4px; border-bottom: 1px solid #eee; cursor: pointer; }
+  #spotList li:hover { background: #eef7f3; }
+  #spotList b { font-variant-numeric: tabular-nums; }
+  #total { margin-top: 8px; font-weight: 700; text-align: right; }
+
+  #timeline { left: 50%; bottom: 20px; transform: translateX(-50%); width: min(560px, calc(100% - 24px)); display: flex; align-items: center; gap: 10px; }
+  #timeline input[type=range] { flex: 1; }
+  #timeline button { border: 0; background: #0a7; color: #fff; border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+  #monthLabel { min-width: 82px; font-weight: 700; text-align: center; }
+
+  #hint { left: 12px; bottom: 84px; font-size: 12px; color: #444; max-width: 230px; line-height: 1.5; }
+
+  /* 지도 위 라벨 */
+  .spot-label { background: #fff; border: 2px solid #f94144; border-radius: 8px; padding: 2px 7px; font-size: 12px; font-weight: 700;
+                white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,.35); transform: translateY(-34px); pointer-events: none; }
+  .spot-label span { display: block; font-weight: 500; font-size: 11px; color: #555; text-align: center; }
+  .harbor-label { background: #0b5c8a; color: #fff; border-radius: 6px; padding: 1px 6px; font-size: 11px; white-space: nowrap; }
+
+  @media (max-width: 700px) {
+    #info { top: auto; bottom: 80px; right: 8px; left: 8px; width: auto; max-height: 28%; }
+    #hint { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="card">
+    <h1>🏝️ 서귀포 3D 공공데이터 지도</h1>
+    <p id="gateMsg">관람객 데이터를 불러오는 중이에요...</p>
+    <div id="gateErr" class="err"></div>
+    <button id="retryBtn" hidden>다시 시도</button>
+  </div>
+</div>
+
+<div id="map"></div>
+
+<div id="layers" class="panel" hidden>
+  <h3>레이어</h3>
+  <label><input type="checkbox" data-layer="spots" checked><span class="dot" style="background:#f94144"></span>관광지 (관람객 3D 막대)</label>
+  <label><input type="checkbox" data-layer="olle" checked><span class="dot" style="background:#7b2cbf"></span>올레길</label>
+  <label><input type="checkbox" data-layer="harbors" checked><span class="dot" style="background:#0b5c8a"></span>항·포구</label>
+  <label><input type="checkbox" data-layer="orchards" checked><span class="dot" style="background:#f8961e"></span>감귤 재배지</label>
+  <div class="base">
+    <label><input type="radio" name="base" value="sat" checked>위성지도</label>
+    <label><input type="radio" name="base" value="osm">일반지도</label>
+  </div>
+  <button class="small" id="resetView">시점 초기화</button>
+</div>
+
+<div id="info" class="panel" hidden>
+  <h3>직영관광지 월별 관람객</h3>
+  <div class="month" id="infoMonth"></div>
+  <ul id="spotList"></ul>
+  <div id="total"></div>
+</div>
+
+<div id="timeline" class="panel" hidden>
+  <button id="playBtn">▶ 재생</button>
+  <input id="slider" type="range" min="0" max="0" value="0">
+  <div id="monthLabel"></div>
+</div>
+
+<div id="hint" class="panel" hidden>
+  🖱️ 왼쪽 드래그: 이동<br>🖱️ 오른쪽 드래그(또는 Ctrl+드래그): 회전·기울이기<br>🖱️ 휠: 확대·축소
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="data/olle.js"></script>
+<script src="data/olle-points.js"></script>
+<script src="data/orchard.js"></script>
+<script src="data/harbor.js"></script>
+<script>
+const API = "/api/tourists"; // Vercel 서버리스 함수 (인증키는 서버 환경변수 DATA_GO_KR_KEY)
+const HEIGHT_PER_VISITOR = 0.03; // 관람객 1명당 막대 높이(m)
+const VIEW = { center: [126.5, 33.2], zoom: 10.1, pitch: 60, bearing: -15 };
+
+// 관광지 좌표(대략 위치)
+const SPOTS = [
+  { key: "천지연폭포",          lng: 126.5545, lat: 33.2470 },
+  { key: "정방폭포",            lng: 126.5718, lat: 33.2442 },
+  { key: "천제연폭포",          lng: 126.4137, lat: 33.2547 },
+  { key: "중문대포 주상절리대", lng: 126.4255, lat: 33.2378 },
+  { key: "산방산_용머리",       lng: 126.3135, lat: 33.2315 },
+  { key: "감귤박물관",          lng: 126.6120, lat: 33.2860 },
+];
+
+const $ = id => document.getElementById(id);
+let rows = [], map, markers = {}, timer = null;
+
+/* ---------- 데이터 ---------- */
+async function fetchData() {
+  const res = await fetch(API);
+  let json = null;
+  try { json = await res.json(); } catch (e) {}
+  if (!res.ok) throw new Error((json && json.error) || "API 오류 (HTTP " + res.status + ")");
+  if (!json.data || !json.data.length) throw new Error("받아온 데이터가 없어요.");
+  return json.data.sort((a, b) => (a["기준연도"] * 100 + a["기준월"]) - (b["기준연도"] * 100 + b["기준월"]));
+}
+
+async function start() {
+  $("retryBtn").hidden = true; $("gateErr").textContent = ""; $("gateMsg").textContent = "관람객 데이터를 불러오는 중이에요...";
+  try {
+    rows = await fetchData();
+    $("gate").hidden = true;
+    initMap();
+  } catch (e) {
+    $("gateMsg").textContent = "데이터를 불러오지 못했어요.";
+    $("gateErr").textContent = e.message || String(e);
+    $("retryBtn").hidden = false;
+  }
+}
+$("retryBtn").addEventListener("click", start);
+start();
+
+/* ---------- 3D 막대 ---------- */
+function barPolygon(s, h, v) {
+  const dx = 0.0020, dy = 0.0017;
+  return { type: "Feature", properties: { name: s.key, h, v },
+    geometry: { type: "Polygon", coordinates: [[
+      [s.lng - dx, s.lat - dy], [s.lng + dx, s.lat - dy], [s.lng + dx, s.lat + dy], [s.lng - dx, s.lat + dy], [s.lng - dx, s.lat - dy]
+    ]] } };
+}
+function monthRow(i) { return rows[i]; }
+function barsAt(i) {
+  const r = monthRow(i);
+  return { type: "FeatureCollection", features: SPOTS.map(s => {
+    const v = Number(r[s.key]) || 0;
+    return barPolygon(s, v * HEIGHT_PER_VISITOR, v);
+  }) };
+}
+
+function updateMonth(i) {
+  const r = monthRow(i);
+  const label = r["기준연도"] + "년 " + r["기준월"] + "월";
+  $("monthLabel").textContent = label; $("infoMonth").textContent = label;
+  map.getSource("spots").setData(barsAt(i));
+  let total = 0;
+  $("spotList").innerHTML = "";
+  SPOTS.forEach(s => {
+    const raw = r[s.key]; const v = Number(raw) || 0; total += v;
+    const txt = raw === null || raw === undefined || raw === "" ? "미집계" : v.toLocaleString() + "명";
+    const li = document.createElement("li");
+    li.innerHTML = "<span>" + s.key + "</span><b>" + txt + "</b>";
+    li.addEventListener("click", () => map.flyTo({ center: [s.lng, s.lat], zoom: 13.2, pitch: 68, bearing: map.getBearing() + 25, duration: 2200 }));
+    $("spotList").appendChild(li);
+    if (markers[s.key]) markers[s.key].getElement().querySelector("span").textContent = txt;
+  });
+  $("total").textContent = "합계 " + total.toLocaleString() + "명";
+}
+
+/* ---------- 지도 ---------- */
+function courseColor(course) {
+  if (!course) return "#888";
+  const n = parseFloat(course) || 0;
+  return "hsl(" + Math.round((n * 37) % 360) + ",75%,50%)";
+}
+
+function initMap() {
+  ["layers", "info", "timeline", "hint"].forEach(id => $(id).hidden = false);
+
+  map = new maplibregl.Map({
+    container: "map",
+    center: VIEW.center, zoom: VIEW.zoom, pitch: VIEW.pitch, bearing: VIEW.bearing,
+    maxPitch: 85, maxZoom: 17,
+    style: {
+      version: 8,
+      sources: {
+        sat: { type: "raster", tileSize: 256, maxzoom: 18,
+               tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+               attribution: "Imagery © Esri, Maxar, Earthstar Geographics" },
+        osm: { type: "raster", tileSize: 256, maxzoom: 19,
+               tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+               attribution: "© OpenStreetMap contributors" },
+        dem: { type: "raster-dem", encoding: "terrarium", tileSize: 256, maxzoom: 14,
+               tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
+               attribution: "Terrain: Mapzen / AWS Terrain Tiles" }
+      },
+      layers: [
+        { id: "sat", type: "raster", source: "sat" },
+        { id: "osm", type: "raster", source: "osm", layout: { visibility: "none" } },
+        { id: "hill", type: "hillshade", source: "dem", paint: { "hillshade-exaggeration": 0.35 } }
+      ]
+    }
+  });
+
+  map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
+  map.addControl(new maplibregl.TerrainControl({ source: "dem", exaggeration: 1.6 }), "top-right");
+  map.addControl(new maplibregl.ScaleControl(), "bottom-right");
+
+  map.on("load", () => {
+    map.setTerrain({ source: "dem", exaggeration: 1.6 });
+
+    // 감귤 재배지
+    map.addSource("orchards", { type: "geojson", data: window.ORCHARDS });
+    map.addLayer({ id: "orchards", type: "fill", source: "orchards",
+      paint: { "fill-color": "#f8961e", "fill-opacity": 0.55, "fill-outline-color": "#c2570a" } });
+
+    // 올레길
+    const olle = window.OLLE_LINES;
+    olle.features.forEach(f => f.properties.color = courseColor(f.properties.course));
+    map.addSource("olle", { type: "geojson", data: olle });
+    map.addLayer({ id: "olle-casing", type: "line", source: "olle", layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": "#fff", "line-width": ["interpolate", ["linear"], ["zoom"], 9, 4, 14, 9] } });
+    map.addLayer({ id: "olle", type: "line", source: "olle", layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": ["get", "color"], "line-width": ["interpolate", ["linear"], ["zoom"], 9, 2.5, 14, 6] } });
+    map.addSource("olle-points", { type: "geojson", data: window.OLLE_POINTS });
+    map.addLayer({ id: "olle-points", type: "circle", source: "olle-points",
+      paint: { "circle-radius": 5, "circle-color": "#fff", "circle-stroke-color": "#7b2cbf", "circle-stroke-width": 2 } });
+
+    // 관광지 3D 막대
+    map.addSource("spots", { type: "geojson", data: barsAt(rows.length - 1) });
+    map.addLayer({ id: "spots", type: "fill-extrusion", source: "spots",
+      paint: {
+        "fill-extrusion-height": ["get", "h"],
+        "fill-extrusion-base": 0,
+        "fill-extrusion-opacity": 0.92,
+        "fill-extrusion-color": ["interpolate", ["linear"], ["get", "v"], 0, "#4cc9f0", 25000, "#f9c74f", 60000, "#f94144"]
+      } });
+
+    // 라벨(DOM 마커 — 한글 폰트 서버 불필요)
+    SPOTS.forEach(s => {
+      const el = document.createElement("div");
+      el.className = "spot-label";
+      el.innerHTML = s.key.replace("_", " ") + "<span></span>";
+      markers[s.key] = new maplibregl.Marker({ element: el, anchor: "bottom" }).setLngLat([s.lng, s.lat]).addTo(map);
+    });
+    markers._harbors = window.HARBORS.features.map(f => {
+      const el = document.createElement("div");
+      el.className = "harbor-label"; el.textContent = "⚓ " + f.properties.name;
+      return new maplibregl.Marker({ element: el }).setLngLat(f.geometry.coordinates).addTo(map);
+    });
+
+    // 팝업
+    const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false });
+    map.on("mousemove", "olle", e => {
+      map.getCanvas().style.cursor = "pointer";
+      const p = e.features[0].properties;
+      popup.setLngLat(e.lngLat).setHTML("🥾 올레길 " + (p.course ? p.course + "코스" : "") + "<br><small>" + (p.name || "") + "</small>").addTo(map);
+    });
+    map.on("mouseleave", "olle", () => { map.getCanvas().style.cursor = ""; popup.remove(); });
+    map.on("mousemove", "olle-points", e => {
+      map.getCanvas().style.cursor = "pointer";
+      popup.setLngLat(e.lngLat).setHTML("🚩 " + e.features[0].properties.name).addTo(map);
+    });
+    map.on("mouseleave", "olle-points", () => { map.getCanvas().style.cursor = ""; popup.remove(); });
+
+    // 타임라인
+    $("slider").max = rows.length - 1; $("slider").value = rows.length - 1;
+    updateMonth(rows.length - 1);
+  });
+}
+
+/* ---------- 컨트롤 ---------- */
+$("slider").addEventListener("input", e => updateMonth(+e.target.value));
+
+$("playBtn").addEventListener("click", () => {
+  if (timer) { clearInterval(timer); timer = null; $("playBtn").textContent = "▶ 재생"; return; }
+  $("playBtn").textContent = "⏸ 정지";
+  let i = +$("slider").value >= rows.length - 1 ? 0 : +$("slider").value;
+  const tick = () => {
+    $("slider").value = i; updateMonth(i);
+    if (++i >= rows.length) { clearInterval(timer); timer = null; $("playBtn").textContent = "▶ 재생"; }
+  };
+  tick(); timer = setInterval(tick, 900);
+});
+
+document.querySelectorAll("[data-layer]").forEach(cb => cb.addEventListener("change", () => {
+  const on = cb.checked, name = cb.dataset.layer, vis = on ? "visible" : "none";
+  if (name === "olle") ["olle", "olle-casing", "olle-points"].forEach(l => map.setLayoutProperty(l, "visibility", vis));
+  else if (name === "harbors") markers._harbors.forEach(m => m.getElement().style.display = on ? "" : "none");
+  else if (name === "spots") {
+    map.setLayoutProperty("spots", "visibility", vis);
+    SPOTS.forEach(s => markers[s.key].getElement().style.display = on ? "" : "none");
+  } else map.setLayoutProperty(name, "visibility", vis);
+}));
+
+document.querySelectorAll("[name=base]").forEach(r => r.addEventListener("change", () => {
+  map.setLayoutProperty("sat", "visibility", r.value === "sat" ? "visible" : "none");
+  map.setLayoutProperty("osm", "visibility", r.value === "osm" ? "visible" : "none");
+}));
+
+$("resetView").addEventListener("click", () => map.flyTo({ ...VIEW, duration: 1800 }));
+</script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>서귀포시 직영관광지 관람객수 API 테스트</title>
+<style>
+  body { font-family: system-ui, "Malgun Gothic", sans-serif; max-width: 1000px; margin: 24px auto; padding: 0 16px; color: #222; }
+  h1 { font-size: 20px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; margin-bottom: 12px; }
+  label { display: flex; flex-direction: column; font-size: 12px; color: #555; gap: 4px; }
+  input, select, button { padding: 8px 10px; font-size: 14px; border: 1px solid #bbb; border-radius: 6px; }
+  input.key { width: 420px; max-width: 100%; }
+  input.num { width: 80px; }
+  button { background: #0a7; color: #fff; border: none; cursor: pointer; }
+  button:hover { background: #086; }
+  #status { margin: 12px 0; padding: 10px; border-radius: 6px; background: #f3f3f3; font-size: 14px; }
+  #status.ok { background: #e3f8ec; color: #065; }
+  #status.err { background: #fde8e8; color: #a00; }
+  #url { font-size: 12px; color: #666; word-break: break-all; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 8px; }
+  th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: right; }
+  th { background: #f7f7f7; }
+  td:first-child, th:first-child { text-align: center; }
+  details { margin-top: 16px; }
+  pre { background: #f7f7f7; padding: 12px; overflow: auto; max-height: 360px; font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>🏝️ 서귀포시 직영관광지 관람객수 추이 API 테스트</h1>
+
+<div class="row">
+  <label>인증키 (Decoding, 브라우저에만 저장)
+    <input id="key" class="key" type="password" placeholder="일반 인증키 붙여넣기">
+  </label>
+</div>
+<div class="row">
+  <label>데이터셋
+    <select id="dataset">
+      <option value="uddi:32a1b877-af20-4505-a76a-fd389ebd30ca">20251002 (기준연도/기준월)</option>
+      <option value="uddi:258f6b02-0967-4fed-b337-83e46cdbba73">20250831 (기준연월)</option>
+    </select>
+  </label>
+  <label>page <input id="page" class="num" type="number" value="1" min="1"></label>
+  <label>perPage <input id="perPage" class="num" type="number" value="20" min="1"></label>
+  <button id="go">호출하기</button>
+</div>
+
+<div id="url"></div>
+<div id="status">대기 중...</div>
+<div id="table"></div>
+<details>
+  <summary>원본 JSON</summary>
+  <pre id="raw"></pre>
+</details>
+
+<script>
+const BASE = "https://api.odcloud.kr/api/15125100/v1/";
+const $ = id => document.getElementById(id);
+
+try { $("key").value = localStorage.getItem("odcloudKey") || ""; } catch (e) {}
+
+function setStatus(msg, cls) { const s = $("status"); s.textContent = msg; s.className = cls || ""; }
+
+function render(rows) {
+  if (!rows.length) { $("table").innerHTML = ""; return; }
+  const cols = Object.keys(rows[0]);
+  const fmt = v => typeof v === "number" ? v.toLocaleString() : (v ?? "");
+  $("table").innerHTML =
+    "<table><thead><tr>" + cols.map(c => `<th>${c}</th>`).join("") + "</tr></thead><tbody>" +
+    rows.map(r => "<tr>" + cols.map(c => `<td>${fmt(r[c])}</td>`).join("") + "</tr>").join("") +
+    "</tbody></table>";
+}
+
+$("go").addEventListener("click", async () => {
+  const key = $("key").value.trim();
+  if (!key) { setStatus("인증키를 입력해줘!", "err"); return; }
+  try { localStorage.setItem("odcloudKey", key); } catch (e) {}
+
+  const params = new URLSearchParams({
+    page: $("page").value,
+    perPage: $("perPage").value,
+    serviceKey: key
+  });
+  const url = BASE + $("dataset").value + "?" + params;
+  $("url").textContent = "GET " + url.replace(key, "***KEY***");
+  setStatus("호출 중...");
+  $("raw").textContent = ""; $("table").innerHTML = "";
+
+  try {
+    const res = await fetch(url);
+    const text = await res.text();
+    $("raw").textContent = text;
+    if (!res.ok) { setStatus(`HTTP ${res.status} 오류`, "err"); return; }
+    const json = JSON.parse(text);
+    $("raw").textContent = JSON.stringify(json, null, 2);
+    setStatus(`성공 ✅ 전체 ${json.totalCount}건 중 ${json.currentCount}건 (page ${json.page})`, "ok");
+    render(json.data || []);
+  } catch (e) {
+    setStatus("실패: " + e.message, "err");
+  }
+});
+</script>
+</body>
+</html>
