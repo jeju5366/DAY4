@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NAVER Maps 테스트</title>
+<style>html,body,#map{margin:0;width:100%;height:100%}</style>
+<!-- YOUR_CLIENT_ID 를 네이버 클라우드 플랫폼의 Maps Application Client ID(ncpKeyId)로 교체 -->
+<script src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=YOUR_CLIENT_ID"></script>
+</head>
+<body>
+<div id="map"></div>
+<script>
+  // 제주국제공항
+  const pos = new naver.maps.LatLng(33.5104, 126.4913);
+  const map = new naver.maps.Map("map", { center: pos, zoom: 14 });
+  new naver.maps.Marker({ position: pos, map });
+</script>
+</body>
+</html>
