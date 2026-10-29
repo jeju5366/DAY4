@@ -10,7 +10,7 @@ const TABS = [
 ];
 
 // Pixabay 이미지 갤러리: 비회원은 6장(전체만), 회원은 카테고리별 24장
-export default function Gallery({ member, onJoin }) {
+export default function Gallery({ member, onJoin, onAdd, cartIds = [] }) {
   const [cat, setCat] = useState("all");
   const [items, setItems] = useState([]);
   const [err, setErr] = useState(null);
@@ -54,7 +54,14 @@ export default function Gallery({ member, onJoin }) {
         {items.map((p) => (
           <figure key={p.id} onClick={() => setOpen(p)}>
             <img src={p.thumb} alt={p.tags} loading="lazy" />
-            <figcaption>{p.tags.split(",")[0]}</figcaption>
+            <figcaption>
+              <span>{p.tags.split(",")[0]}</span>
+              <button
+                className="addcart"
+                onClick={(e) => { e.stopPropagation(); member ? onAdd(p) : onJoin(); }}
+                title={member ? "장바구니에 담기" : "로그인하고 담기"}
+              >{cartIds.includes(String(p.id)) ? "🛒✔" : "🛒+"}</button>
+            </figcaption>
           </figure>
         ))}
       </div>

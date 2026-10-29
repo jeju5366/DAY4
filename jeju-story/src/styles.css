@@ -30,7 +30,18 @@ main{max-width:1060px;margin:0 auto;padding:0 18px 40px}
 figure{margin:0;border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 3px 10px rgba(0,0,0,.08);cursor:zoom-in}
 figure img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;transition:transform .3s}
 figure:hover img{transform:scale(1.05)}
-figcaption{padding:8px 10px;font-size:13px;color:var(--stone);text-transform:capitalize}
+figcaption{padding:8px 10px;font-size:13px;color:var(--stone);text-transform:capitalize;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.addcart{font:inherit;font-size:13px;font-weight:800;border:0;border-radius:14px;padding:.25em .7em;cursor:pointer;color:#fff;background:var(--orange)}
+.cartbtn{padding:.4em .9em;font-size:14px}
+.badge{display:inline-block;margin-left:6px;min-width:20px;padding:0 6px;border-radius:10px;background:#fff;color:var(--orange-d);font-size:12px;line-height:20px}
+.cart h2{margin:28px 0 14px}.cart h2 small{font-weight:400;color:var(--stone)}
+.cart-list{list-style:none;margin:0 0 18px;padding:0;display:flex;flex-direction:column;gap:10px}
+.cart-list li{display:flex;align-items:center;gap:12px;background:#fff;border-radius:14px;padding:10px;box-shadow:0 3px 10px rgba(0,0,0,.08)}
+.cart-list img{width:88px;height:66px;object-fit:cover;border-radius:10px}
+.cart-list .info{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0;text-transform:capitalize}
+.cart-list .info a{font-size:13px;text-transform:none}
+.qty{display:flex;align-items:center;gap:8px}.qty span{min-width:20px;text-align:center;font-weight:800}
+.cart-actions{display:flex;justify-content:space-between;gap:10px}
 .lightbox{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.85);display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:10px;padding:16px;cursor:zoom-out}
 .lightbox img{max-width:100%;max-height:82vh;border-radius:10px}

@@ -23,6 +23,9 @@
    - **Site URL**: 배포 주소 (예: `https://내프로젝트.vercel.app`)
    - **Redirect URLs**: `http://localhost:5173/**` 와 `https://내프로젝트.vercel.app/**` 추가
 
+5. **장바구니 테이블**: SQL Editor → New query → `supabase/cart.sql` 내용을 붙여넣고 Run
+   (`cart_items` 테이블 + 본인 것만 접근하는 RLS 정책이 만들어져요)
+
 ## 2) Pixabay 키
 1. https://pixabay.com 가입/로그인 → https://pixabay.com/api/docs/ 접속
 2. 문서 상단 "Parameters → key" 자리에 표시되는 API Key 복사

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "./supabase.js";
 import Auth from "./Auth.jsx";
 import Gallery from "./Gallery.jsx";
+import Cart from "./Cart.jsx";
+import { useCart } from "./useCart.js";
 
 // 제주를 대표하는 IP(캐릭터/콘텐츠) 소개 카드
 const IPS = [
@@ -14,7 +16,8 @@ const IPS = [
 
 export default function App() {
   const [session, setSession] = useState(null);
-  const [view, setView] = useState("home"); // "home" | "auth"
+  const [view, setView] = useState("home"); // "home" | "auth" | "cart"
+  const cart = useCart(session);
 
   useEffect(() => {
     if (!supabase) return;
@@ -35,6 +38,7 @@ export default function App() {
         <nav>
           {session ? (
             <>
+              <button className="btn cartbtn" onClick={() => setView("cart")}>🛒 장바구니{cart.count > 0 && <span className="badge">{cart.count}</span>}</button>
               <span className="who">{session.user.email}</span>
               <button className="btn ghost" onClick={logout}>로그아웃</button>
             </>
@@ -52,6 +56,8 @@ export default function App() {
 
       {view === "auth" && !session ? (
         <Auth onBack={() => setView("home")} />
+      ) : view === "cart" && session ? (
+        <Cart cart={cart} onBack={() => setView("home")} />
       ) : (
         <main>
           <section className="hero">
@@ -70,7 +76,7 @@ export default function App() {
             ))}
           </section>
 
-          <Gallery member={!!session} onJoin={() => setView("auth")} />
+          <Gallery member={!!session} onJoin={() => setView("auth")} onAdd={cart.add} cartIds={cart.items.map((i) => i.photo_id)} />
         </main>
       )}
 
